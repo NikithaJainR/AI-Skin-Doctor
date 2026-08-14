@@ -1,0 +1,11 @@
+{
+  "name": "AI Skin Doctor",
+  "description": "An intelligent AI dermatologist assistant providing educational skin assessments, visual analysis, voice support, progress tracking, and personalized care recommendations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

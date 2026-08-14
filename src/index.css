@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+html, body, #root {
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+@layer utilities {
+  .bg-doctor-pattern {
+    background-color: #F4F9FA;
+    background-image: 
+      radial-gradient(circle at 10% 10%, rgba(8, 127, 140, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 90% 90%, rgba(47, 128, 237, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(232, 247, 248, 0.6) 0%, transparent 80%),
+      url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%20087f8c' fill-opacity='0.035' fill-rule='evenodd'%3E%3Cpath d='M18 18h4v-4h-4v4zm0 8h4v-4h-4v4zm-4-4h4v-4h-4v4zm8 0h4v-4h-4v4z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  .dark .bg-doctor-pattern {
+    background-color: #0B1726;
+    background-image: 
+      radial-gradient(circle at 10% 10%, rgba(8, 127, 140, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 90% 90%, rgba(47, 128, 237, 0.12) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(8, 127, 140, 0.05) 0%, transparent 80%),
+      url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%20087f8c' fill-opacity='0.06' fill-rule='evenodd'%3E%3Cpath d='M18 18h4v-4h-4v4zm0 8h4v-4h-4v4zm-4-4h4v-4h-4v4zm8 0h4v-4h-4v4z'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  .doctor-card-glow {
+    box-shadow: 0 4px 20px -2px rgba(8, 127, 140, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .doctor-card-glow {
+    box-shadow: 0 4px 25px -2px rgba(8, 127, 140, 0.2), 0 2px 10px -1px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Custom thin scrollbar for internal panel containers */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(8, 127, 140, 0.25);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(8, 127, 140, 0.45);
+  }
+}
+
+
