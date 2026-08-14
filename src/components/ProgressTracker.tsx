@@ -46,8 +46,15 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ language }) =>
         }),
       });
 
-      const data = await response.json();
-      if (data.success && data.comparison) {
+      const rawText = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Invalid JSON response: ${rawText.slice(0, 80)}`);
+      }
+
+      if (data && data.success && data.comparison) {
         const log: ProgressLog = {
           id: `log-${Date.now()}`,
           date: new Date().toLocaleDateString(),
@@ -60,6 +67,8 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ language }) =>
         setCurrentResult(log);
         saveProgressLog(log);
         setPastLogs(getProgressLogs());
+      } else {
+        throw new Error(data?.error || "Failed to generate comparison.");
       }
     } catch (err) {
       console.error("Comparison error", err);

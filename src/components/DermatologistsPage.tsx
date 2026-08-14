@@ -678,40 +678,69 @@ export const DermatologistsPage: React.FC<DermatologistsPageProps> = ({ isOpen =
                   </div>
 
                   {/* Address & Contact Info */}
-                  <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300 pt-1">
+                  <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 pt-1">
                     <div className="flex items-start gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                      <span className="text-[11px] line-clamp-2">{doc.address}</span>
+                      <MapPin className="w-3.5 h-3.5 text-teal-500 shrink-0 mt-0.5" />
+                      <span className="text-[11px] leading-tight line-clamp-2 text-slate-700 dark:text-slate-200">
+                        {doc.address}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-[11px]">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      {doc.phone ? (
-                        <a
-                          href={`tel:${doc.phone}`}
-                          className="font-semibold text-teal-600 dark:text-teal-400 hover:underline"
-                        >
-                          {doc.phone}
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 italic">Phone number not listed</span>
-                      )}
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Phone className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                        {doc.phone ? (
+                          <a
+                            href={`tel:${doc.phone}`}
+                            className="font-bold text-teal-600 dark:text-teal-400 hover:underline truncate"
+                          >
+                            {doc.phone}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic">Phone unavailable in OSM</span>
+                        )}
+                      </div>
+
+                      {/* Web / Search lookup link */}
+                      <a
+                        href={`https://www.google.com/search?q=${encodeURIComponent(
+                          `${doc.facilityName || doc.doctorName || "Dermatologist"} ${doc.address || ""}`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-semibold text-teal-600 dark:text-teal-400 hover:underline inline-flex items-center gap-0.5 shrink-0"
+                        title="Search clinic details and contact online"
+                      >
+                        <span>Find info</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
                     </div>
                   </div>
                 </div>
 
-                {/* Card Action: Small Directions Button */}
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                {/* Card Action: Directions & Call Buttons */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-2">
                   <a
                     href={doc.directionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-xs font-extrabold flex items-center justify-center gap-1.5 transition"
+                    className="flex-1 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-xs font-extrabold flex items-center justify-center gap-1.5 transition"
                   >
                     <Navigation className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                     <span>Directions</span>
                     <ExternalLink className="w-3 h-3 text-teal-500" />
                   </a>
+
+                  {doc.phone && (
+                    <a
+                      href={`tel:${doc.phone}`}
+                      className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold flex items-center justify-center gap-1 transition shadow-2xs shrink-0"
+                      title="Call clinic"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>Call</span>
+                    </a>
+                  )}
                 </div>
               </div>
             ))}

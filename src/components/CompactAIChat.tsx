@@ -111,8 +111,15 @@ export const CompactAIChat: React.FC<CompactAIChatProps> = ({
         }),
       });
 
-      const data = await response.json();
-      if (data.success && data.reply) {
+      const rawText = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Invalid JSON response: ${rawText.slice(0, 80)}`);
+      }
+
+      if (data && data.success && data.reply) {
         const replyText = data.reply;
         const botMsg: ChatMessage = {
           id: `msg-${Date.now() + 1}`,
@@ -125,7 +132,7 @@ export const CompactAIChat: React.FC<CompactAIChatProps> = ({
         // Speak the reply aloud via Gemini TTS!
         await playTTS(null, language, replyText);
       } else {
-        throw new Error(data.error || "Failed to get AI response.");
+        throw new Error(data?.error || "Failed to get AI response.");
       }
     } catch (err) {
       console.warn("Voice AI Chat error:", err);

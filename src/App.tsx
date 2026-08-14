@@ -107,8 +107,24 @@ export default function App() {
         }),
       });
 
-      const data = await response.json();
-      if (data.success && data.report) {
+      const rawText = await response.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        console.error("Non-JSON API response from /api/analyze-skin:", rawText);
+        if (response.status === 404) {
+          throw new Error("API route not found (404). Please ensure the backend serverless function is deployed.");
+        } else if (response.status === 413) {
+          throw new Error("Image/video file size is too large for the network payload. Please use a smaller photo.");
+        } else if (response.status === 500) {
+          throw new Error("Server error (500). Please ensure GEMINI_API_KEY is configured in your Vercel Environment Variables.");
+        } else {
+          throw new Error(`Server returned status ${response.status}: ${rawText.slice(0, 100)}`);
+        }
+      }
+
+      if (data && data.success && data.report) {
         const reportWithMeta: AssessmentReport = {
           id: `rep-${Date.now()}`,
           createdAt: new Date().toISOString(),
@@ -133,7 +149,7 @@ export default function App() {
           setCurrentReport(reportWithMeta);
         }
       } else {
-        throw new Error(data.error || "Failed to analyze skin image.");
+        throw new Error(data?.error || "Failed to analyze skin image.");
       }
     } catch (err: any) {
       console.error("Diagnosis error", err);

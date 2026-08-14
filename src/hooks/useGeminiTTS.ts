@@ -244,10 +244,16 @@ export function useGeminiTTS(): UseGeminiTTSReturn {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = await response.json();
+        const rawText = await response.text();
+        let data: any = null;
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          throw new Error(`Invalid JSON response: ${rawText.slice(0, 80)}`);
+        }
 
-        if (!data.success || !data.audioBase64) {
-          throw new Error(data.error || "No audio payload from TTS API");
+        if (!data || !data.success || !data.audioBase64) {
+          throw new Error(data?.error || "No audio payload from TTS API");
         }
 
         console.log("[TTS] Audio data received");

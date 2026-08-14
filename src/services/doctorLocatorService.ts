@@ -105,23 +105,37 @@ export function normalizeOsmElement(element: any, userLat: number, userLon: numb
   const distanceKm = calculateHaversineDistance(userLat, userLon, lat, lon);
 
   // Check name & specialty
-  const rawName = tags.name || tags.official_name || tags.brand || "";
-  const doctorNameTag = tags["doctor:name"] || tags["person:name"] || tags["contact:person"] || null;
+  const rawName = (tags.name || tags["name:en"] || tags.official_name || tags.alt_name || tags.brand || "").trim();
+  const doctorNameTag =
+    tags["doctor:name"] ||
+    tags["person:name"] ||
+    tags["contact:person"] ||
+    tags["operator"] ||
+    tags["physician:name"] ||
+    tags["doctor"] ||
+    null;
 
   let doctorName: string | null = null;
-  if (doctorNameTag) {
-    doctorName = doctorNameTag.startsWith("Dr.") ? doctorNameTag : `Dr. ${doctorNameTag}`;
+  if (doctorNameTag && typeof doctorNameTag === "string" && doctorNameTag.trim()) {
+    const trimmed = doctorNameTag.trim();
+    doctorName = /^dr\.?\s/i.test(trimmed) ? trimmed : `Dr. ${trimmed}`;
   } else if (/^dr\.?\s/i.test(rawName) || /^doctor\s/i.test(rawName)) {
     doctorName = rawName;
   }
 
   let facilityName = rawName;
   if (!facilityName) {
-    if (tags.healthcare === "dermatology") facilityName = "Dermatology Clinic";
-    else if (tags.amenity === "clinic" || tags.healthcare === "clinic") facilityName = "Medical Clinic";
-    else if (tags.amenity === "doctors" || tags.healthcare === "doctor") facilityName = "Doctor's Clinic";
-    else if (tags.amenity === "hospital") facilityName = "Medical Center / Hospital";
-    else facilityName = "Healthcare Provider";
+    if (tags.healthcare === "dermatology" || tags["healthcare:speciality"] === "dermatology") {
+      facilityName = "Dermatology & Skin Clinic";
+    } else if (tags.amenity === "clinic" || tags.healthcare === "clinic") {
+      facilityName = "Skin & Medical Care Clinic";
+    } else if (tags.amenity === "doctors" || tags.healthcare === "doctor") {
+      facilityName = "Doctor's Clinic";
+    } else if (tags.amenity === "hospital") {
+      facilityName = "Medical Hospital & Health Center";
+    } else {
+      facilityName = "Healthcare Provider";
+    }
   }
 
   // Detect dermatology specificity
@@ -129,8 +143,8 @@ export function normalizeOsmElement(element: any, userLat: number, userLon: numb
     tags.healthcare === "dermatology" ||
     tags["healthcare:speciality"] === "dermatology" ||
     tags.specialty === "dermatology" ||
-    /dermatol|skin|derma|cutaneous|cosmetol/i.test(facilityName) ||
-    (doctorName && /dermatol|skin/i.test(doctorName));
+    /dermatol|skin|derma|cutaneous|cosmetol|aesthetic|laser/i.test(facilityName) ||
+    (doctorName && /dermatol|skin|derma/i.test(doctorName));
 
   let type: NearbyDoctor["type"] = "clinic";
   if (isDermatology) {
@@ -141,23 +155,46 @@ export function normalizeOsmElement(element: any, userLat: number, userLon: numb
     type = "doctor";
   }
 
-  // Construct Address from existing OSM tags
+  // Construct Address from rich OSM tags
   const addressParts = [
-    tags["addr:housenumber"],
-    tags["addr:street"],
-    tags["addr:suburb"] || tags["addr:neighbourhood"],
-    tags["addr:city"],
-    tags["addr:postcode"],
-  ].filter(Boolean);
+    tags["addr:housenumber"] || tags["addr:housename"] || tags["addr:door"],
+    tags["addr:street"] || tags["addr:road"] || tags["addr:place"],
+    tags["addr:suburb"] || tags["addr:neighbourhood"] || tags["addr:district"] || tags["addr:quarter"] || tags["addr:locality"],
+    tags["addr:city"] || tags["addr:town"] || tags["addr:village"] || tags["addr:state"],
+    tags["addr:postcode"] || tags["addr:postal_code"] || tags["postal_code"],
+  ]
+    .filter(Boolean)
+    .map((s: string) => s.trim());
 
-  let address = addressParts.length > 0 ? addressParts.join(", ") : tags["addr:full"] || null;
-
-  if (!address) {
-    address = "Address not listed";
+  let address: string | null = null;
+  if (addressParts.length >= 2) {
+    address = addressParts.join(", ");
+  } else if (tags["addr:full"]) {
+    address = tags["addr:full"].trim();
+  } else if (addressParts.length === 1) {
+    // If only postcode or street exists, create clean localized notation
+    const part = addressParts[0];
+    address = tags["addr:city"] ? `${part}, ${tags["addr:city"]}` : `${part} (Near ${lat.toFixed(3)}, ${lon.toFixed(3)})`;
   }
 
-  // Phone number extraction
-  const phone = tags.phone || tags["contact:phone"] || tags["phone:mobile"] || tags["contact:mobile"] || null;
+  if (!address || address === "Address not listed") {
+    // Fallback: Format coordinate area reference with distance
+    address = `Near Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+  }
+
+  // Phone number extraction across all standard contact/telecom tags
+  const phone =
+    tags.phone ||
+    tags["contact:phone"] ||
+    tags["phone:mobile"] ||
+    tags["contact:mobile"] ||
+    tags.mobile ||
+    tags["telephone"] ||
+    tags["contact:telephone"] ||
+    tags["contact:whatsapp"] ||
+    tags["contact:phone:mobile"] ||
+    tags["operator:phone"] ||
+    null;
 
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
 
@@ -167,7 +204,7 @@ export function normalizeOsmElement(element: any, userLat: number, userLon: numb
     facilityName,
     type,
     address,
-    phone,
+    phone: phone ? phone.trim() : null,
     latitude: lat,
     longitude: lon,
     distanceKm,

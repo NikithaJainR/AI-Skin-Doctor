@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { createServer as createViteServer } from "vite";
@@ -9,6 +10,17 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// CORS headers
+app.use((_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (_req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
 // Increase payload limit for media uploads
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -17,7 +29,9 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 function getAiClient() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured in environment variables.");
+    throw new Error(
+      "GEMINI_API_KEY is not configured in environment variables. If deploying on Vercel, please add GEMINI_API_KEY in your Vercel Project Settings > Environment Variables."
+    );
   }
   return new GoogleGenAI({
     apiKey,
@@ -29,8 +43,8 @@ function getAiClient() {
   });
 }
 
-// Health check endpoint
-app.get("/api/health", (_req, res) => {
+// Health check endpoint (matches both /api/health and /health)
+app.get(["/api/health", "/health"], (_req, res) => {
   res.json({ status: "ok", service: "AI Skin Doctor API" });
 });
 
@@ -55,8 +69,8 @@ function parseDataUrl(dataUrl: string) {
   };
 }
 
-// 1. Primary AI Skin Analysis Endpoint
-app.post("/api/analyze-skin", async (req, res) => {
+// 1. Primary AI Skin Analysis Endpoint (matches both /api/analyze-skin and /analyze-skin)
+app.post(["/api/analyze-skin", "/analyze-skin"], async (req, res) => {
   try {
     const { images = [], videoFrames = [], patientInfo = {}, language = "English" } = req.body;
 
@@ -232,8 +246,8 @@ ${patientSummary}
   }
 });
 
-// 2. Interactive AI Chat Assistant Endpoint
-app.post("/api/chat", async (req, res) => {
+// 2. Interactive AI Chat Assistant Endpoint (matches /api/chat and /chat)
+app.post(["/api/chat", "/chat"], async (req, res) => {
   try {
     const { message, previousAssessment, chatHistory = [], language = "English" } = req.body;
 
@@ -287,8 +301,8 @@ Guidelines:
   }
 });
 
-// 3. AI Skin Progress Comparison Endpoint
-app.post("/api/compare-progress", async (req, res) => {
+// 3. AI Skin Progress Comparison Endpoint (matches /api/compare-progress and /compare-progress)
+app.post(["/api/compare-progress", "/compare-progress"], async (req, res) => {
   try {
     const { beforeImage, afterImage, conditionName = "skin issue", language = "English" } = req.body;
 
@@ -362,8 +376,8 @@ Respond in JSON language: "${language}".
   }
 });
 
-// 4. Gemini TTS Endpoint for Doctor Spoken Summary
-app.post("/api/tts", async (req, res) => {
+// 4. Gemini TTS Endpoint for Doctor Spoken Summary (matches /api/tts and /tts)
+app.post(["/api/tts", "/tts"], async (req, res) => {
   try {
     const { report, text, language = "English", voiceName = "Kore" } = req.body;
     const ai = getAiClient();
@@ -530,31 +544,45 @@ function processOsmElements(elements: any[], userLat: number, userLon: number) {
       if (typeof lat !== "number" || typeof lon !== "number") return null;
 
       const dist = calculateHaversineKm(userLat, userLon, lat, lon);
-      const rawName = tags.name || tags.official_name || tags.brand || "";
-      const doctorNameTag = tags["doctor:name"] || tags["person:name"] || tags["contact:person"] || null;
+      const rawName = (tags.name || tags["name:en"] || tags.official_name || tags.alt_name || tags.brand || "").trim();
+      const doctorNameTag =
+        tags["doctor:name"] ||
+        tags["person:name"] ||
+        tags["contact:person"] ||
+        tags["operator"] ||
+        tags["physician:name"] ||
+        tags["doctor"] ||
+        null;
 
       let doctorName: string | null = null;
-      if (doctorNameTag) {
-        doctorName = doctorNameTag.startsWith("Dr.") ? doctorNameTag : `Dr. ${doctorNameTag}`;
+      if (doctorNameTag && typeof doctorNameTag === "string" && doctorNameTag.trim()) {
+        const trimmed = doctorNameTag.trim();
+        doctorName = /^dr\.?\s/i.test(trimmed) ? trimmed : `Dr. ${trimmed}`;
       } else if (/^dr\.?\s/i.test(rawName) || /^doctor\s/i.test(rawName)) {
         doctorName = rawName;
       }
 
       let facilityName = rawName;
       if (!facilityName) {
-        if (tags.healthcare === "dermatology") facilityName = "Dermatology Clinic";
-        else if (tags.amenity === "clinic" || tags.healthcare === "clinic") facilityName = "Medical Clinic";
-        else if (tags.amenity === "doctors" || tags.healthcare === "doctor") facilityName = "Doctor's Clinic";
-        else if (tags.amenity === "hospital") facilityName = "Medical Center / Hospital";
-        else facilityName = "Healthcare Provider";
+        if (tags.healthcare === "dermatology" || tags["healthcare:speciality"] === "dermatology") {
+          facilityName = "Dermatology & Skin Clinic";
+        } else if (tags.amenity === "clinic" || tags.healthcare === "clinic") {
+          facilityName = "Skin & Medical Care Clinic";
+        } else if (tags.amenity === "doctors" || tags.healthcare === "doctor") {
+          facilityName = "Doctor's Clinic";
+        } else if (tags.amenity === "hospital") {
+          facilityName = "Medical Hospital & Health Center";
+        } else {
+          facilityName = "Healthcare Provider";
+        }
       }
 
       const isDermatology =
         tags.healthcare === "dermatology" ||
         tags["healthcare:speciality"] === "dermatology" ||
         tags.specialty === "dermatology" ||
-        /dermatol|skin|derma|cutaneous|cosmetol/i.test(facilityName) ||
-        (doctorName && /dermatol|skin/i.test(doctorName));
+        /dermatol|skin|derma|cutaneous|cosmetol|aesthetic|laser/i.test(facilityName) ||
+        (doctorName && /dermatol|skin|derma/i.test(doctorName));
 
       let type = "clinic";
       if (isDermatology) type = "dermatologist";
@@ -562,17 +590,41 @@ function processOsmElements(elements: any[], userLat: number, userLon: number) {
       else if (tags.amenity === "doctors" || tags.healthcare === "doctor") type = "doctor";
 
       const addressParts = [
-        tags["addr:housenumber"],
-        tags["addr:street"],
-        tags["addr:suburb"] || tags["addr:neighbourhood"],
-        tags["addr:city"],
-        tags["addr:postcode"],
-      ].filter(Boolean);
+        tags["addr:housenumber"] || tags["addr:housename"] || tags["addr:door"],
+        tags["addr:street"] || tags["addr:road"] || tags["addr:place"],
+        tags["addr:suburb"] || tags["addr:neighbourhood"] || tags["addr:district"] || tags["addr:quarter"] || tags["addr:locality"],
+        tags["addr:city"] || tags["addr:town"] || tags["addr:village"] || tags["addr:state"],
+        tags["addr:postcode"] || tags["addr:postal_code"] || tags["postal_code"],
+      ]
+        .filter(Boolean)
+        .map((s: string) => s.trim());
 
-      let address = addressParts.length > 0 ? addressParts.join(", ") : tags["addr:full"] || null;
-      if (!address) address = "Address not listed";
+      let address: string | null = null;
+      if (addressParts.length >= 2) {
+        address = addressParts.join(", ");
+      } else if (tags["addr:full"]) {
+        address = tags["addr:full"].trim();
+      } else if (addressParts.length === 1) {
+        const part = addressParts[0];
+        address = tags["addr:city"] ? `${part}, ${tags["addr:city"]}` : `${part} (Near ${lat.toFixed(3)}, ${lon.toFixed(3)})`;
+      }
 
-      const phone = tags.phone || tags["contact:phone"] || tags["phone:mobile"] || tags["contact:mobile"] || null;
+      if (!address || address === "Address not listed") {
+        address = `Near Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+      }
+
+      const phone =
+        tags.phone ||
+        tags["contact:phone"] ||
+        tags["phone:mobile"] ||
+        tags["contact:mobile"] ||
+        tags.mobile ||
+        tags["telephone"] ||
+        tags["contact:telephone"] ||
+        tags["contact:whatsapp"] ||
+        tags["contact:phone:mobile"] ||
+        tags["operator:phone"] ||
+        null;
       const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
 
       return {
@@ -581,7 +633,7 @@ function processOsmElements(elements: any[], userLat: number, userLon: number) {
         facilityName,
         type,
         address,
-        phone,
+        phone: phone ? phone.trim() : null,
         latitude: lat,
         longitude: lon,
         distanceKm: dist,
@@ -616,14 +668,14 @@ function processOsmElements(elements: any[], userLat: number, userLon: number) {
   return uniqueDocs;
 }
 
-// 4. API Endpoint: Nearby Doctors via Overpass OSM
-app.get("/api/nearby-doctors", async (req, res) => {
+// 5. API Endpoint: Nearby Doctors via Overpass OSM (matches /api/nearby-doctors and /nearby-doctors)
+app.get(["/api/nearby-doctors", "/nearby-doctors"], async (req, res) => {
   try {
     const lat = parseFloat(req.query.lat as string);
     const lon = parseFloat(req.query.lon as string);
 
     if (isNaN(lat) || isNaN(lon)) {
-      return res.status(400).json({ error: "Invalid or missing lat/lon query parameters." });
+      return res.status(400).json({ success: false, error: "Invalid or missing lat/lon query parameters." });
     }
 
     let rawElements = await queryOverpassServer(lat, lon, 5000);
@@ -641,12 +693,12 @@ app.get("/api/nearby-doctors", async (req, res) => {
   }
 });
 
-// 5. API Endpoint: Search Doctors by City / Area
-app.get("/api/search-doctors-city", async (req, res) => {
+// 6. API Endpoint: Search Doctors by City / Area (matches /api/search-doctors-city and /search-doctors-city)
+app.get(["/api/search-doctors-city", "/search-doctors-city"], async (req, res) => {
   try {
     const city = req.query.city as string;
     if (!city || !city.trim()) {
-      return res.status(400).json({ error: "Missing city parameter." });
+      return res.status(400).json({ success: false, error: "Missing city parameter." });
     }
 
     const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
@@ -655,7 +707,7 @@ app.get("/api/search-doctors-city", async (req, res) => {
 
     const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "AISkinDoctor/1.0" } });
     if (!nomRes.ok) {
-      return res.status(500).json({ error: "Geocoding service error." });
+      return res.status(500).json({ success: false, error: "Geocoding service error." });
     }
 
     const nomData: any = await nomRes.json();
@@ -688,6 +740,15 @@ app.get("/api/search-doctors-city", async (req, res) => {
   }
 });
 
+// Global API Error Handler Middleware
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Express Global Handler:", err);
+  res.status(500).json({
+    success: false,
+    error: err?.message || "Internal server error",
+  });
+});
+
 // Vite Middleware & Production Serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
@@ -700,7 +761,12 @@ async function startServer() {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: "Not found" });
+      }
     });
   }
 
